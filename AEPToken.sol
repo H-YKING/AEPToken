@@ -294,4 +294,53 @@ contract AEPToken is Ownable, DetailedERC20, StandardToken {
     // 创建者获得所有代币
     balances[msg.sender] = initialSupply;
   }
+
+
+  // 第三方付手续费转账 gas消耗:83143
+  function transferProxy(
+    address _from,
+    address _to,
+    uint256 _value,
+    uint256 _fee,
+    uint8 v,
+    bytes32 r,
+    bytes32 s
+  ) public returns (bool)
+  {
+    // basic
+    require(_to != address(0));
+//    require(_value <= balances[_from]);
+//    require(_fee <= balances[_from]);
+//    require(_value + _fee <= balances[_from]);
+
+    // 签名内容
+    uint32 _nonce = nonces[_from];
+    bytes32 hashSign = keccak256(
+      _from, _to, _value, _fee, _nonce
+    );
+
+    // 验证签名
+    require(
+      ecrecover(
+        hashSign, v, r, s
+      ) == _from);
+    // nonces自增
+    nonces[_from] = _nonce + 1;
+
+    // 转账
+    if (_fee > 0) {
+      balances[_from] = balances[_from].sub(_value).sub(_fee);
+      balances[msg.sender] = balances[msg.sender].add(_fee);
+    } else {
+      balances[_from] = balances[_from].sub(_value);
+    }
+    balances[_to] = balances[_to].add(_value);
+    Transfer(_from, _to, _value);
+    return true;
+  }
+
+  // 读nonces
+  function noncesOf(address _addr) public view returns (uint32) {
+    return nonces[_addr];
+  }
 }
